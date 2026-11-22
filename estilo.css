@@ -1,0 +1,111 @@
+/* Tema oscuro y de poco brillo: se usa a las 3 de la mañana */
+:root {
+  --fondo: #12131f;
+  --tarjeta: #1c1e30;
+  --tarjeta-2: #25283f;
+  --borde: #2f3350;
+  --texto: #e7e8f2;
+  --suave: #9a9db8;
+  --acento: #8f8cf2;
+  --dia: #f0b45a;
+  --noche: #8f8cf2;
+  --llanto: #ef7a6a;
+  --toma: #6fd4a8;
+  --peligro: #e5675a;
+  --radio: 18px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--fondo); color: var(--texto); }
+body {
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  padding: env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
+}
+main { max-width: 520px; margin: 0 auto; }
+[hidden] { display: none !important; }
+h1 { font-size: 26px; margin: 32px 0 8px; }
+h2 { font-size: 15px; margin: 0 0 10px; color: var(--suave); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.suave { color: var(--suave); font-size: 14px; }
+.error { color: var(--peligro); }
+label { display: block; margin: 12px 0; color: var(--suave); font-size: 14px; }
+input, textarea, select {
+  display: block; width: 100%; margin-top: 6px; padding: 12px; font: inherit; color: var(--texto);
+  background: var(--tarjeta-2); border: 1px solid var(--borde); border-radius: 12px;
+}
+label.check { display: flex; gap: 10px; align-items: center; color: var(--texto); font-size: 16px; }
+label.check input { width: 22px; height: 22px; margin: 0; }
+.dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.btn {
+  display: block; width: 100%; margin: 8px 0; padding: 14px; font: inherit; font-weight: 600;
+  color: var(--texto); background: var(--tarjeta-2); border: 1px solid var(--borde); border-radius: 14px; cursor: pointer;
+}
+.btn.primario { background: var(--acento); border-color: var(--acento); color: #14142a; }
+.btn.peligro { color: var(--peligro); }
+.fila-botones { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
+.fila-botones .btn { width: auto; margin: 0; padding: 12px 16px; }
+.espacio { flex: 1; }
+
+.barra { display: flex; align-items: center; gap: 8px; padding: 12px 0; }
+.titulo { font-weight: 700; font-size: 20px; flex: 1; }
+.icono { background: none; border: 0; color: var(--texto); font-size: 24px; padding: 4px 10px; cursor: pointer; }
+.sync { background: none; border: 1px solid var(--borde); color: var(--suave); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; }
+.sync.mal { color: var(--llanto); border-color: var(--llanto); }
+
+.estado { text-align: center; padding: 22px 12px 18px; border-radius: 24px; background: var(--tarjeta); margin-bottom: 14px; border: 1px solid var(--borde); }
+.estado .etiqueta { color: var(--suave); font-size: 15px; }
+.estado .reloj { font-size: 54px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; margin: 2px 0; }
+.estado .sub { color: var(--suave); font-size: 14px; min-height: 1.4em; }
+.estado.dia .reloj { color: var(--dia); }
+.estado.noche .reloj, .estado.siesta .reloj { color: var(--noche); }
+.estado.acostando .reloj { color: var(--texto); }
+.estado.llorando .reloj { color: var(--llanto); }
+.estado.toma .reloj { color: var(--toma); }
+.estado.despertar_noche .reloj { color: var(--llanto); }
+
+.acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.accion {
+  min-height: 84px; padding: 12px; border-radius: var(--radio); border: 1px solid var(--borde);
+  background: var(--tarjeta-2); color: var(--texto); font: inherit; font-weight: 650; font-size: 17px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+}
+.accion .ico { font-size: 26px; line-height: 1; }
+.accion.ancho { grid-column: span 2; }
+.accion.grande { grid-column: span 2; min-height: 104px; font-size: 20px; }
+.accion.dia { border-color: var(--dia); }
+.accion.noche { border-color: var(--noche); }
+.accion.llanto { border-color: var(--llanto); background: #3a2230; }
+.accion.toma { border-color: var(--toma); }
+.accion.principal { background: var(--acento); color: #14142a; border-color: var(--acento); }
+.accion:active { transform: scale(.98); }
+.lados { grid-column: span 2; display: flex; gap: 8px; }
+.lados button { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--suave); font: inherit; }
+.lados button.on { border-color: var(--toma); color: var(--toma); }
+
+.tarjeta { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio); padding: 14px 16px; margin-bottom: 14px; }
+.cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 8px; }
+.cifra b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.cifra span { color: var(--suave); font-size: 12.5px; }
+.tarjeta .enlace { background: none; border: 0; color: var(--acento); font: inherit; padding: 10px 0 0; cursor: pointer; }
+
+.registro { list-style: none; margin: 0; padding: 0; }
+.registro li { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--borde); cursor: pointer; }
+.registro li:first-child { border-top: 0; }
+.registro .ico { width: 28px; text-align: center; font-size: 20px; }
+.registro .que { flex: 1; }
+.registro .que small { display: block; color: var(--suave); }
+.registro .hora { font-variant-numeric: tabular-nums; color: var(--suave); }
+.registro .dia-sep { color: var(--suave); font-size: 13px; cursor: default; padding-top: 14px; }
+.registro .pend { color: var(--dia); font-size: 12px; }
+
+.aviso {
+  position: fixed; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); max-width: 500px; margin: 0 auto;
+  background: #2b2e4a; border: 1px solid var(--borde); border-radius: 16px; padding: 10px 12px; box-shadow: 0 8px 30px #0008;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+}
+.aviso .txt { flex: 1 1 100%; }
+.aviso button { background: var(--tarjeta-2); color: var(--texto); border: 1px solid var(--borde); border-radius: 10px; padding: 8px 12px; font: inherit; }
+
+dialog { background: var(--tarjeta); color: var(--texto); border: 1px solid var(--borde); border-radius: 20px; width: min(92vw, 480px); padding: 18px; }
+dialog::backdrop { background: #000a; }
