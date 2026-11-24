@@ -3,16 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#12131f">
+<meta name="theme-color" content="#0b0f26">
 <title>Registro de sueño</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icono.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="estilo.css">
 </head>
-<body>
+<body class="fase-noche">
+<div class="cielo" aria-hidden="true"><div class="astro"></div><div id="estrellas"></div></div>
+
 <main id="app">
   <!-- Configuración inicial -->
-  <section id="config" class="pantalla" hidden>
+  <section id="config" class="pantalla config" hidden>
+    <div class="logo"></div>
     <h1>Registro de sueño</h1>
     <p class="suave">Primera vez en este móvil. Abre el enlace de configuración que te pasó la otra persona, o rellena los datos.</p>
     <label>Nombre del bebé <input id="cfg-bebe" autocomplete="off"></label>
@@ -20,79 +26,47 @@
     <label>URL del servidor <input id="cfg-url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
     <label>Token <input id="cfg-token" autocomplete="off"></label>
     <button id="cfg-guardar" class="btn primario">Empezar</button>
-    <button id="cfg-demo" class="btn">Probar en modo demo (sin guardar nada)</button>
+    <button id="cfg-demo" class="btn">Probar en modo demo</button>
     <p id="cfg-error" class="error" hidden></p>
   </section>
 
   <!-- Pantalla principal -->
   <section id="principal" class="pantalla" hidden>
     <header class="barra">
-      <span class="titulo" id="titulo"></span>
-      <button id="sync" class="sync" title="Sincronización"></button>
-      <button id="menu-btn" class="icono" aria-label="Menú">⋮</button>
+      <div>
+        <div class="titulo" id="titulo"></div>
+        <div class="fecha-hoy" id="fecha-hoy"></div>
+      </div>
+      <span class="espacio"></span>
+      <button id="sync" class="sync"></button>
+      <button id="menu-btn" class="icono-btn" aria-label="Menú"></button>
     </header>
 
-    <div id="estado" class="estado">
-      <div id="estado-etiqueta" class="etiqueta"></div>
-      <div id="estado-reloj" class="reloj"></div>
-      <div id="estado-sub" class="sub"></div>
+    <div class="reloj-24">
+      <svg id="dial" viewBox="0 0 340 340" aria-label="Reloj de 24 horas"></svg>
+      <div class="centro" id="centro">
+        <div class="c-etiqueta" id="c-etiqueta"></div>
+        <div class="c-tiempo" id="c-tiempo"></div>
+        <div class="c-sub" id="c-sub"></div>
+      </div>
     </div>
 
     <div id="acciones" class="acciones"></div>
 
-    <section class="tarjeta" id="hoy"></section>
-    <section class="tarjeta" id="anoche"></section>
-
+    <section id="proximo" class="tarjeta proximo" hidden></section>
+    <section id="hoy" class="tarjeta"></section>
+    <section id="anoche" class="tarjeta"></section>
+    <section id="tendencia" class="tarjeta"></section>
     <section class="tarjeta">
-      <h2>Registro</h2>
+      <div class="tarjeta-cab"><h2>Registro</h2><button class="mini" id="nuevo-btn">+ Añadir</button></div>
       <ul id="registro" class="registro"></ul>
     </section>
+    <p class="pie" id="pie"></p>
   </section>
 </main>
 
 <div id="aviso" class="aviso" hidden></div>
-
-<dialog id="editor">
-  <form method="dialog" id="editor-form">
-    <h2 id="editor-titulo"></h2>
-    <div id="editor-campos"></div>
-    <div class="fila-botones">
-      <button value="borrar" class="btn peligro" id="editor-borrar">Borrar</button>
-      <span class="espacio"></span>
-      <button value="cancelar" class="btn">Cancelar</button>
-      <button value="guardar" class="btn primario">Guardar</button>
-    </div>
-  </form>
-</dialog>
-
-<dialog id="ficha">
-  <form method="dialog">
-    <h2 id="ficha-titulo">Ficha de la noche</h2>
-    <label class="check"><input type="checkbox" id="ficha-mala"> Noche mala</label>
-    <label>Notas <textarea id="ficha-notas" rows="3"></textarea></label>
-    <p class="suave">Solo si se olvidó el modo acostar (si no, se calculan solos):</p>
-    <div class="dos">
-      <label>Latencia (min) <input id="ficha-latencia" type="number" min="0" inputmode="numeric"></label>
-      <label>Llanto (min) <input id="ficha-llanto" type="number" min="0" inputmode="numeric"></label>
-    </div>
-    <div class="fila-botones">
-      <span class="espacio"></span>
-      <button value="cancelar" class="btn">Cancelar</button>
-      <button value="guardar" class="btn primario">Guardar</button>
-    </div>
-  </form>
-</dialog>
-
-<dialog id="menu">
-  <form method="dialog">
-    <h2>Opciones</h2>
-    <button value="nuevo" class="btn">+ Añadir un registro olvidado</button>
-    <button value="compartir" class="btn">Compartir configuración con la otra persona</button>
-    <button value="sync" class="btn">Sincronizar ahora</button>
-    <button value="salir" class="btn peligro">Cerrar sesión en este móvil</button>
-    <button value="cancelar" class="btn">Cerrar</button>
-  </form>
-</dialog>
+<dialog id="hoja" class="hoja"><div class="asa"></div><div id="hoja-cont"></div></dialog>
 
 <script type="module" src="app.js"></script>
 </body>
