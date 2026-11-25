@@ -74,7 +74,8 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--acento); ou
 /* ---------- barra ---------- */
 .barra { display: flex; align-items: center; gap: 8px; padding: 14px 0 4px; }
 .titulo { font-weight: 800; font-size: 24px; letter-spacing: -.01em; }
-.fecha-hoy { color: var(--suave); font-size: 13px; font-weight: 600; text-transform: capitalize; }
+.fecha-hoy { color: var(--suave); font-size: 13px; font-weight: 600; }
+.fecha-hoy::first-letter, .detalle b::first-letter { text-transform: uppercase; }
 .sync {
   display: inline-flex; align-items: center; gap: 6px; background: var(--vidrio); border: 1px solid var(--borde);
   color: var(--suave); border-radius: 999px; padding: 6px 11px; font: inherit; font-size: 12.5px; font-weight: 700;
@@ -260,3 +261,58 @@ dialog.hoja::backdrop { background: rgba(3, 4, 15, .55); backdrop-filter: blur(3
 .menu-lista .peligro, .menu-lista .peligro svg { color: var(--peligro); }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- pestañas ---------- */
+.pestanas { display: flex; gap: 4px; padding: 4px; margin: 8px 0 6px; border-radius: 999px; background: var(--vidrio); border: 1px solid var(--borde); }
+.pestanas button { flex: 1; padding: 9px; border: 0; border-radius: 999px; background: none; color: var(--suave); font: inherit; font-weight: 800; transition: background .25s, color .25s; }
+.pestanas button.on { background: var(--acento); color: #17142e; }
+
+/* ---------- ventanas de vigilia (tarjeta Hoy) ---------- */
+.sub-titulo { margin: 16px 0 8px; color: var(--suave); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.ventanas { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.vv { flex: 1 0 auto; min-width: 88px; padding: 10px 12px; border-radius: 16px; background: rgba(0, 0, 0, .18); border: 1px solid var(--borde); }
+.vv b { display: block; font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.vv .vv-n, .vv .vv-t { display: block; color: var(--suave); font-size: 11.5px; font-weight: 700; }
+.vv.curso { border-color: var(--acento); background: color-mix(in srgb, var(--acento) 12%, transparent); }
+.vv.curso b { color: var(--acento); }
+
+/* ---------- historial ---------- */
+.periodo { display: flex; gap: 8px; margin: 10px 0 14px; }
+.periodo button, .metricas button { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--borde); background: var(--vidrio); color: var(--suave); font: inherit; font-size: 13.5px; font-weight: 800; white-space: nowrap; }
+.periodo button { flex: 1; }
+.periodo button.on, .metricas button.on { background: var(--acento); color: #17142e; border-color: transparent; }
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.kpi { text-align: left; padding: 11px 12px; border-radius: 16px; border: 1px solid var(--borde); background: rgba(0, 0, 0, .18); color: var(--texto); font: inherit; cursor: pointer; }
+.kpi.on { border-color: var(--acento); }
+.kpi .kpi-n { display: block; color: var(--suave); font-size: 12px; font-weight: 700; }
+.kpi b { display: block; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.delta { font-size: 12px; font-weight: 800; color: var(--suave); }
+.delta.bien { color: var(--toma); }
+.delta.mal { color: var(--llanto); }
+.metricas { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 6px; padding: 0 16px 4px; }
+.grafico-h, .grafico-s { width: 100%; display: block; }
+.grafico-h .barra, .grafico-s .barra { fill: var(--noche); transition: opacity .2s; }
+.grafico-h .punto, .grafico-s .punto { fill: var(--noche); }
+.grafico-h .mala { fill: var(--llanto); }
+.grafico-h .sel, .grafico-s .sel { fill: var(--acento); }
+.grafico-h .zona { fill: transparent; cursor: pointer; }
+.grafico-h .movil { fill: none; stroke: var(--acento); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; opacity: .9; }
+.grafico-h .ref, .grafico-s .ref { stroke: rgba(255, 255, 255, .15); stroke-dasharray: 3 4; }
+.grafico-h text, .grafico-s text { fill: var(--suave); font-size: 10px; font-weight: 700; font-family: inherit; text-anchor: middle; }
+.grafico-h .ref-t { text-anchor: end; fill: var(--tenue); }
+.grafico-s .valor { fill: var(--texto); font-size: 10.5px; }
+.detalle { display: block; width: 100%; margin-top: 10px; padding: 10px 12px; text-align: left; border-radius: 14px; border: 1px solid var(--borde); background: rgba(0, 0, 0, .18); color: var(--texto); font: inherit; font-size: 14px; }
+.detalle b { display: inline-block; }
+.detalle span { color: var(--acento); font-weight: 800; float: right; }
+.detalle-vacio { margin: 10px 0 0; }
+.lista-noches { list-style: none; margin: 0; padding: 0; }
+.lista-noches li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--borde); cursor: pointer; }
+.lista-noches li:first-child { border-top: 0; }
+.lista-noches .ln-f { width: 58px; text-transform: capitalize; }
+.lista-noches .ln-f b { display: block; font-size: 14px; }
+.lista-noches small { display: block; color: var(--suave); font-size: 12px; font-weight: 600; }
+.lista-noches .ln-d { flex: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.lista-noches .ln-v { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--acento); }
+.lista-noches .ln-v.mala { color: var(--llanto); }
+.grafico-h .rejilla { stroke: rgba(255, 255, 255, .07); }
+.grafico-h .eje-y { text-anchor: end; fill: var(--tenue); font-size: 9.5px; }

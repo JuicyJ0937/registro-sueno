@@ -41,7 +41,9 @@
       <button id="sync" class="sync"></button>
       <button id="menu-btn" class="icono-btn" aria-label="Menú"></button>
     </header>
+    <nav class="pestanas" id="pestanas"><button data-v="ahora" class="on">Ahora</button><button data-v="historial">Historial</button></nav>
 
+    <div id="vista-ahora">
     <div class="reloj-24">
       <svg id="dial" viewBox="0 0 340 340" aria-label="Reloj de 24 horas"></svg>
       <div class="centro" id="centro">
@@ -61,6 +63,9 @@
       <div class="tarjeta-cab"><h2>Registro</h2><button class="mini" id="nuevo-btn">+ Añadir</button></div>
       <ul id="registro" class="registro"></ul>
     </section>
+    </div>
+
+    <div id="vista-historial" hidden></div>
     <p class="pie" id="pie"></p>
   </section>
 </main>

@@ -106,25 +106,75 @@ export function jornada(D, ev = vivos()) {
 }
 const mediana = (xs) => { const v = xs.filter((x) => x != null && x > 0).sort((a, b) => a - b); if (!v.length) return null; const m = v.length >> 1; return v.length % 2 ? v[m] : Math.round((v[m - 1] + v[m]) / 2); };
 
-// Próxima siesta u hora de dormir, a partir de las ventanas de vigilia de los últimos 7 días
+export { mediana };
+
+// ---------- histórico de noches ----------
+// Cada noche como objeto con los campos de derivarNoche. Las noches registradas con la app se calculan aquí
+// (siempre al día); las demás vienen de la pestaña Nighttime del servidor (p. ej. las importadas del Excel).
+const CAB = {
+  'Nighttime Date': ['fecha', 't'], 'Night': ['noche_n', 't'], 'Wake-up time (that day)': ['despertar', 't'],
+  'Number of naps': ['siestas', 'n'], 'Total daytime sleep': ['sueno_dia_min', 'd'], 'Last Wake Window': ['ultima_vv_min', 'd'],
+  'Last nap duration': ['lap_nap_min', 'd'], 'Total 24-hour sleep': ['sueno_24h_min', 'd'], 'Bedtime': ['bedtime', 't'],
+  'Asleep at': ['dormido', 't'], 'Total crying duration': ['llanto_min', 'd'], 'Time from bedtime to sleep onset': ['latencia_min', 'd'],
+  'Total awake time (to sleep onset)': ['despierto_min', 'd'], 'Wake-up time (next morning)': ['despertar_sig', 't'],
+  'Number of feedings': ['tomas', 'n'], 'Bad night? (multiples despertares, early wake, etc)': ['noche_mala', 'b'],
+  'Wakings (not counting the feeding ones)': ['despertares', 'n'], 'Total night sleep': ['sueno_noche_min', 'd'],
+  'Longest sleep stretch': ['tramo_largo', 't'], 'Duration of longest sleep stretch': ['tramo_largo_min', 'd'], 'Notes': ['notas', 't'], 'Source': ['origen', 't'],
+};
+const leerDur = (v) => { const s = String(v ?? '').trim(); let m = s.match(/^(\d+):(\d{2})/); if (m) return +m[1] * 60 + +m[2]; m = s.match(/^(\d+)\s*min/); if (m) return +m[1]; return s === '' ? null : (Number.isFinite(+s) ? +s : null); };
+export function filaAObj(f) {
+  const o = {};
+  for (const [cab, [k, tipo]] of Object.entries(CAB)) {
+    const v = f[cab];
+    if (v == null || v === '') { o[k] = null; continue; }
+    o[k] = tipo === 'd' ? leerDur(v) : tipo === 'n' ? Number(v) : tipo === 'b' ? /^(s[ií]|yes|true)/i.test(v) : String(v);
+  }
+  return o;
+}
+db.filas = leerLS('filas', []);                                     // filas del servidor (histórico)
+
+// Noches desde «desde» hasta ayer (o hoy), combinando app y servidor. Las noches sin datos se omiten.
+export function historico(desde = '2000-01-01', hasta = hoyStr()) {
+  const ev = vivos().map((e) => (abierto(e) ? { ...e, fin: local() } : e));
+  const conEventos = new Set(ev.filter((e) => e.tipo === 'despertar' || e.tipo === 'dormido').map((e) => ini(e).slice(0, 10)));
+  const porFecha = new Map(db.filas.map((f) => { const o = filaAObj(f); return [o.fecha, o]; }));
+  const fechas = new Set([...porFecha.keys(), ...conEventos]);
+  const out = [];
+  for (const D of [...fechas].filter((d) => d && d >= desde && d <= hasta).sort()) {
+    const srv = porFecha.get(D);
+    if (srv && srv.origen === 'Excel') { out.push({ ...srv, ...fichaSobre(D, srv) }); continue; }
+    if (conEventos.has(D)) { out.push({ ...derivarNoche(ev, D, db.fichas), origen: 'app' }); continue; }
+    if (srv) out.push(srv);
+  }
+  return out;
+}
+const fichaSobre = (D, r) => { const f = db.fichas[D]; return f ? { noche_mala: f.noche_mala ?? r.noche_mala, notas: f.notas ?? r.notas } : {}; };
+
+// Próxima siesta u hora de dormir. Con datos de la app se usan las ventanas reales de cada siesta;
+// con el histórico (Excel) se usan el nº de siestas, la última ventana y la media de las demás.
 export function prediccion(st) {
   if (st.modo !== 'dia' || !st.desde) return null;
   const hoy = hoyStr();
   const ev = vivos();
   const hoyJ = jornada(hoy, ev);
   if (!hoyJ) return null;
-  const previas = [];
-  for (let k = 1; k <= 7; k++) { const j = jornada(masDias(hoy, -k), ev); if (j && j.dormido) previas.push(j); }
-  if (!previas.length) return { sinDatos: true };
-  const nSiestas = mediana(previas.map((j) => j.siestas.length)) ?? 2;
+  const noches = historico(masDias(hoy, -7), masDias(hoy, -1)).filter((r) => r.dormido && r.siestas != null);
+  const jornadas = [];
+  for (let k = 1; k <= 7; k++) { const j = jornada(masDias(hoy, -k), ev); if (j && j.dormido) jornadas.push(j); }
+  if (!noches.length && !jornadas.length) return { sinDatos: true };
+  const nSiestas = mediana(noches.map((r) => r.siestas)) ?? mediana(jornadas.map((j) => j.siestas.length)) ?? 2;
   const hechas = hoyJ.siestas.filter((s) => s.fin).length;
   const tocaDormir = hechas >= nSiestas;
-  const ventana = tocaDormir
-    ? mediana(previas.map((j) => j.ultimaVentana))
-    : mediana(previas.map((j) => j.ventanas[hechas]));
+  let ventana;
+  if (tocaDormir) ventana = mediana(noches.map((r) => r.ultima_vv_min)) ?? mediana(jornadas.map((j) => j.ultimaVentana));
+  else {
+    ventana = mediana(jornadas.map((j) => j.ventanas[hechas]));
+    // sin jornadas de la app: ventana media de las demás = (tiempo despierto − última ventana) / nº de siestas
+    if (!ventana) ventana = mediana(noches.map((r) => (r.despierto_min != null && r.ultima_vv_min != null && r.siestas ? Math.round((r.despierto_min - r.ultima_vv_min) / r.siestas) : null)));
+  }
   if (!ventana) return { sinDatos: true };
   const cuando = sumarMin(st.desde, ventana);
-  return { tipo: tocaDormir ? 'dormir' : 'siesta', numero: hechas + 1, cuando, ventana, dias: previas.length };
+  return { tipo: tocaDormir ? 'dormir' : 'siesta', numero: hechas + 1, cuando, ventana, dias: Math.max(noches.length, jornadas.length) };
 }
 
 // ---------- sincronización ----------
@@ -171,13 +221,14 @@ export async function recibir() {
   if (!cfg || cfg.url === 'demo' || document.hidden) return;
   try {
     const desde = masDias(hoyStr(), -10);
-    const r = await fetch(cfg.url + '?' + new URLSearchParams({ token: cfg.token, desde }));
+    const r = await fetch(cfg.url + '?' + new URLSearchParams({ token: cfg.token, desde, filas_desde: '2000-01-01' }));
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'error del servidor');
     for (const e of j.eventos) if (!db.pendientes.has(e.id)) db.eventos.set(e.id, normalizar(e));
     const enServidor = new Set(j.eventos.map((e) => e.id));
     for (const [id, e] of db.eventos) if (ini(e) >= desde && !enServidor.has(id) && !db.pendientes.has(id)) db.eventos.delete(id);
     for (const [d, f] of Object.entries(j.fichas || {})) if (!db.fichasPend.has(d)) db.fichas[d] = { ...f, fecha: d };
+    if (Array.isArray(j.filas)) { db.filas = j.filas; guardarLS('filas', j.filas); }
     sync.error = null;
     sync.ultima = local(); guardarLS('ultimaSync', sync.ultima);
     persistir(); alCambiar();

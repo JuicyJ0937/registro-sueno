@@ -1,6 +1,6 @@
 // Service worker: guarda la app en el móvil para que abra sin conexión. Las llamadas al servidor no se tocan.
-const VERSION = 'sm-14b2c663d6';
-const ARCHIVOS = ['./', 'index.html', 'estilo.css', 'app.js', 'datos.js', 'derivar.js', 'manifest.webmanifest', 'icono.svg', 'icono-192.png', 'icono-512.png'];
+const VERSION = 'sm-769d208bff';
+const ARCHIVOS = ['./', 'index.html', 'estilo.css', 'app.js', 'datos.js', 'historial.js', 'derivar.js', 'manifest.webmanifest', 'icono.svg', 'icono-192.png', 'icono-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));
