@@ -44,6 +44,7 @@
     <nav class="pestanas" id="pestanas"><button data-v="ahora" class="on">Ahora</button><button data-v="historial">Historial</button></nav>
 
     <div id="vista-ahora">
+    <div class="nav-jornada"><button id="j-prev" aria-label="Jornada anterior">‹</button><div class="j-txt"><b id="j-titulo"></b><small id="j-sub"></small></div><button id="j-next" aria-label="Jornada siguiente">›</button></div>
     <div class="reloj-24">
       <svg id="dial" viewBox="0 0 340 340" aria-label="Reloj de 24 horas"></svg>
       <div class="centro" id="centro">
@@ -56,8 +57,9 @@
     <div id="acciones" class="acciones"></div>
 
     <section id="proximo" class="tarjeta proximo" hidden></section>
-    <section id="hoy" class="tarjeta"></section>
+    <section id="total-jornada" class="tarjeta"></section>
     <section id="anoche" class="tarjeta"></section>
+    <section id="hoy" class="tarjeta"></section>
     <section id="tendencia" class="tarjeta"></section>
     <section class="tarjeta">
       <div class="tarjeta-cab"><h2>Registro</h2><button class="mini" id="nuevo-btn">+ Añadir</button></div>

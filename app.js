@@ -68,11 +68,32 @@ function arco(r, a, b) {
   return `M${x1.toFixed(1)} ${y1.toFixed(1)}A${r} ${r} 0 ${barrido > Math.PI ? 1 : 0} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
 }
 
-function pintarDial(st, pred) {
+// ---------- jornadas: la noche desde que se duerme + el día siguiente hasta volver a dormirse ----------
+// La jornada «D» empieza con el dormido de la tarde/noche de D−1 y acaba con el dormido de la tarde de D.
+// Su sueño total es el «Total 24-hour sleep» del Excel (noche anterior + siestas del día).
+function dormidoEntre(a, b) { return vivos().filter((e) => e.tipo === 'dormido' && e.t > a && e.t < b).pop(); }
+function jornadaActual(st) {
+  if (st.fase === 'noche') {                       // dormido (o despierto/tomando) por la noche: ya es la jornada siguiente
+    const dorm = vivos().filter((e) => e.tipo === 'dormido').pop();
+    if (dorm) { const d = dorm.t.slice(0, 10); return Number(dorm.t.slice(11, 13)) < 12 ? d : masDias(d, 1); }
+  }
+  return hoyStr();
+}
+function ventanaJornada(D, actual) {
+  const ini = dormidoEntre(masDias(D, -1) + 'T12:00:00', D + 'T12:00:00');
+  const fin = dormidoEntre(D + 'T12:00:00', masDias(D, 1) + 'T12:00:00');
+  const desde = ini ? ini.t : masDias(D, -1) + 'T21:00:00';
+  const hasta = fin ? fin.t : actual ? local() : masDias(D, 1) + 'T04:00:00';
+  return { D, actual, desde, hasta, conInicio: !!ini, cerrada: !!fin };
+}
+
+function pintarDial(win, pred) {
   const ahora = local();
-  const desde = local(new Date(Date.now() - 24 * 3600e3 + 60e3));
-  const clip = (x) => ({ ...x, a: x.a < desde ? desde : x.a, b: x.b > ahora ? ahora : x.b });
-  const ivs = intervalos(ahora).filter((x) => x.b > desde).map(clip);
+  const { desde, actual } = win;
+  const hasta = actual ? ahora : win.hasta;
+  const clip = (x) => ({ ...x, a: x.a < desde ? desde : x.a, b: x.b > hasta ? hasta : x.b });
+  // la cuna y el llanto de antes del inicio son del acostar de la jornada anterior: fuera
+  const ivs = intervalos(ahora).filter((x) => x.b > desde && x.a < hasta && !((x.cls === 'cuna' || x.cls === 'llanto') && x.a < desde)).map(clip);
   let s = `<circle class="pista" cx="${C}" cy="${C}" r="${R}"/>`;
   for (let h = 0; h < 24; h++) {
     const a = (h / 24) * 2 * Math.PI - Math.PI / 2;
@@ -87,8 +108,7 @@ function pintarDial(st, pred) {
   }
   const dibujar = (cls, r, filtro) => ivs.filter(filtro).forEach((x) => {
     const d = arco(r, x.a, x.b);
-    const viejo = !x.vivo && minEntre(x.b, ahora) > 12 * 60;
-    if (d) s += `<path class="arco ${cls}${x.vivo ? ' vivo' : ''}${viejo ? ' viejo' : ''}" data-id="${x.ev.id}" d="${d}"/>`;
+    if (d) s += `<path class="arco ${cls}${x.vivo && actual ? ' vivo' : ''}" data-id="${x.ev.id}" d="${d}"/>`;
   });
   dibujar('noche', R, (x) => x.cls === 'noche');
   dibujar('siesta', R, (x) => x.cls === 'siesta');
@@ -96,8 +116,15 @@ function pintarDial(st, pred) {
   dibujar('cuna', R - 24, (x) => x.cls === 'cuna');
   dibujar('llanto', R - 24, (x) => x.cls === 'llanto');
   ivs.filter((x) => x.cls === 'toma').forEach((x) => { const [px, py] = punto(R, angulo(x.a)); s += `<circle class="toma" data-id="${x.ev.id}" cx="${px}" cy="${py}" r="6.5"/>`; });
-  const [nx, ny] = punto(R, angulo(ahora));
-  s += `<circle class="ahora-halo" cx="${nx}" cy="${ny}" r="5"/><circle class="ahora" cx="${nx}" cy="${ny}" r="5"/>`;
+  if (win.conInicio) {                              // marca de inicio de la jornada (se durmió)
+    const [ix, iy] = punto(R, angulo(desde));
+    s += `<circle class="inicio" cx="${ix}" cy="${iy}" r="9"/><path class="inicio-luna" transform="translate(${ix - 6} ${iy - 6}) scale(.5)" d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z"/>`;
+  }
+  if (actual) {
+    const [nx, ny] = punto(R, angulo(ahora));
+    s += `<circle class="ahora-halo" cx="${nx}" cy="${ny}" r="5"/><circle class="ahora" cx="${nx}" cy="${ny}" r="5"/>`;
+  }
+  if (!ivs.length) s += `<text class="vacio-dial" x="${C}" y="${C + 70}">sin registros con hora</text>`;
   $('#dial').innerHTML = s;
 }
 $('#dial').addEventListener('click', (e) => {
@@ -134,6 +161,7 @@ function pintarCentro(st) {
   }
   $('#c-etiqueta').textContent = et;
   $('#c-tiempo').textContent = t;
+  $('#c-tiempo').classList.remove('total');
   $('#c-sub').innerHTML = sub;
   const clave = st.modo + (st.llanto ? '+' : '');
   if (modoAnterior && modoAnterior !== clave) { const c = $('#centro'); c.classList.remove('cambio'); void c.offsetWidth; c.classList.add('cambio'); }
@@ -144,31 +172,69 @@ function pintarCentro(st) {
 // ---------- acciones ----------
 function registrar(e, texto, campo) { const ev = guardar(e); vibrar(18); pintar(); aviso(texto, ev, campo); }
 function cerrarEv(ev, cuando, texto) { const e = guardar({ ...ev, fin: cuando }); vibrar(18); pintar(); aviso(texto, e, 'fin'); }
+// Cada acción recibe la hora real («cuando»): ahora, o la que se elija en el panel si se pulsó tarde
 const ACC = {
-  despertar: (st) => {
-    const ahora = local();
-    vivos().filter(abierto).forEach((e) => guardar({ ...e, fin: ahora }));
-    registrar({ tipo: 'despertar', t: ahora }, 'Buenos días', 't');
+  despertar: (st, cuando) => {
+    vivos().filter(abierto).forEach((e) => guardar({ ...e, fin: e.ini > cuando ? e.ini : cuando }));
+    registrar({ tipo: 'despertar', t: cuando }, 'Buenos días', 't');
   },
-  siesta: () => registrar({ tipo: 'siesta', ini: local(), como: 'cuna' }, 'Siesta empezada', 'ini'),
-  finSiesta: (st) => cerrarEv(st.ev, local(), 'Siesta terminada'),
-  cuna: () => registrar({ tipo: 'a_la_cuna', t: local() }, 'A la cuna', 't'),
-  llora: () => registrar({ tipo: 'llanto', ini: local() }, 'Llorando', 'ini'),
-  para: (st) => cerrarEv(st.llanto, local(), 'Ha parado de llorar'),
-  dormido: (st) => {
-    const ahora = local();
-    if (st.llanto) guardar({ ...st.llanto, fin: ahora });
-    registrar({ tipo: 'dormido', t: ahora }, 'Dormido', 't');
+  siesta: (st, cuando) => registrar({ tipo: 'siesta', ini: cuando, como: 'cuna' }, 'Siesta empezada', 'ini'),
+  finSiesta: (st, cuando) => cerrarEv(st.ev, cuando, 'Siesta terminada'),
+  cuna: (st, cuando) => registrar({ tipo: 'a_la_cuna', t: cuando }, 'A la cuna', 't'),
+  llora: (st, cuando) => registrar({ tipo: 'llanto', ini: cuando }, 'Llorando', 'ini'),
+  para: (st, cuando) => cerrarEv(st.llanto, cuando, 'Ha parado de llorar'),
+  dormido: (st, cuando) => {
+    if (st.llanto) guardar({ ...st.llanto, fin: st.llanto.ini > cuando ? st.llanto.ini : cuando });
+    registrar({ tipo: 'dormido', t: cuando }, 'Dormido', 't');
   },
-  despiertaNoche: () => registrar({ tipo: 'despertar_noche', ini: local() }, 'Despertar nocturno', 'ini'),
-  vuelveDormir: (st) => cerrarEv(st.ev, local(), 'Vuelve a dormir'),
-  toma: (st) => {
-    const ahora = local();
-    if (st.modo === 'despertar_noche') guardar({ ...st.ev, fin: ahora });
-    registrar({ tipo: 'toma', ini: ahora }, 'Toma empezada', 'ini');
+  despiertaNoche: (st, cuando) => registrar({ tipo: 'despertar_noche', ini: cuando }, 'Despertar nocturno', 'ini'),
+  vuelveDormir: (st, cuando) => cerrarEv(st.ev, cuando, 'Vuelve a dormir'),
+  toma: (st, cuando) => {
+    if (st.modo === 'despertar_noche') guardar({ ...st.ev, fin: st.ev.ini > cuando ? st.ev.ini : cuando });
+    registrar({ tipo: 'toma', ini: cuando }, 'Toma empezada', 'ini');
   },
-  finToma: (st) => cerrarEv(st.ev, local(), 'Toma terminada'),
+  finToma: (st, cuando) => cerrarEv(st.ev, cuando, 'Toma terminada'),
 };
+// Llorar / parar se registran al momento (la rapidez importa); el resto abre el panel de hora
+const RAPIDAS = new Set(['llora', 'para']);
+// hora mínima válida para cada acción (no puede acabar algo antes de que empezara)
+function minimoAccion(accion, st) {
+  if (['finSiesta', 'vuelveDormir', 'finToma'].includes(accion)) return st.ev.ini;
+  if (accion === 'dormido' && st.modo === 'acostando') return st.ev.t;
+  return null;
+}
+function pulsar(b) {
+  const st = estadoActual();
+  if (RAPIDAS.has(b.accion)) { ACC[b.accion](st, local()); return; }
+  vibrar(8);
+  panelHora(b, st);
+}
+
+// Panel «¿cuándo?»: botón grande «Ahora» y atajos «hace X min» u otra hora
+function panelHora(b, st) {
+  const min = minimoAccion(b.accion, st);
+  const ahora = local();
+  const opciones = [5, 10, 15, 20, 30, 45].map((m) => ({ m, t: sumarMin(ahora, -m) })).filter((o) => !min || o.t >= min);
+  abrirHoja(`<h3><span class="r-ico" style="--c:${b.c || 'var(--acento)'}">${ico(b.icono)}</span>${esc(b.texto)}</h3>
+    <button type="button" class="ahora-btn" id="ph-ahora">${ico('check')}<span>Ahora <small>${hm(ahora)}</small></span></button>
+    ${opciones.length ? `<div class="sub-titulo">Ya pasó hace…</div>
+    <div class="hace">${opciones.map((o) => `<button type="button" data-t="${o.t}"><b>${o.m} min</b><small>${hm(o.t)}</small></button>`).join('')}</div>` : ''}
+    <details class="otra-hora"><summary>Otra hora</summary>
+      ${campoHora('cuando', 'Fue a las', sumarMin(ahora, -5))}
+      <button type="button" class="btn primario" id="ph-otra">Guardar</button>
+    </details>`, (cont) => {
+    montarCampoHora(cont);
+    const hecho = (t) => {
+      if (t > local()) { alert('La hora no puede ser futura.'); return; }
+      if (min && t < min) { alert('No puede ser antes de las ' + hm(min) + '.'); return; }
+      cerrarHoja();
+      ACC[b.accion](estadoActual(), t);
+    };
+    $('#ph-ahora', cont).onclick = () => hecho(local());
+    cont.querySelectorAll('.hace [data-t]').forEach((x) => { x.onclick = () => hecho(x.dataset.t); });
+    $('#ph-otra', cont).onclick = () => hecho(leerCampoHora(cont.querySelector('[data-campo=cuando]')));
+  });
+}
 
 function botones(st) {
   const h = new Date().getHours();
@@ -218,7 +284,7 @@ function pintarAcciones(st) {
     el.className = 'principal-btn ' + (b.cls || '');
     el.innerHTML = ico(b.icono) + `<span>${esc(b.texto)}</span>`;
     el.addEventListener('pointerdown', (e) => onda(el, e));
-    el.onclick = () => ACC[b.accion](estadoActual());
+    el.onclick = () => pulsar(b);
     cont.append(el);
   }
   if (s.length) {
@@ -229,7 +295,7 @@ function pintarAcciones(st) {
       el.className = 'sec-btn';
       el.style.setProperty('--c', b.c);
       el.innerHTML = `<span class="burbuja">${ico(b.icono)}</span><span>${esc(b.texto)}</span>`;
-      el.onclick = () => ACC[b.accion](estadoActual());
+      el.onclick = () => pulsar(b);
       fila.append(el);
     }
     cont.append(fila);
@@ -259,85 +325,114 @@ function pintarProximo(st, pred) {
     </div>`;
 }
 
-function linea(D, ivs, ahora) {
-  const ini0 = D + 'T00:00:00', fin0 = masDias(D, 1) + 'T00:00:00';
-  const pos = (s) => (Math.max(0, Math.min(1440, minEntre(ini0, s))) / 1440) * 100;
-  let h = '';
-  for (const x of ivs) {
-    if (x.b <= ini0 || x.a >= fin0 || x.cls === 'llanto' || x.cls === 'cuna') continue;
-    const a = pos(x.a < ini0 ? ini0 : x.a), b = pos(x.b > fin0 ? fin0 : x.b);
-    const cls = x.cls === 'desp' ? 'desp' : x.cls;
-    h += `<i class="${cls}" style="left:${a}%;width:${Math.max(cls === 'toma' ? .9 : .4, b - a)}%"></i>`;
-  }
-  if (D === hoyStr()) h += `<i class="ahora" style="left:${pos(ahora)}%"></i>`;
-  return `<div class="linea"><div class="l-cab"><span>${D === hoyStr() ? 'HOY' : 'AYER'}</span><span>00 · 06 · 12 · 18 · 24</span></div><div class="l-barra">${h}</div></div>`;
-}
-
-// Ventanas de vigilia de hoy (la última, en curso si está despierto) comparadas con las típicas de la semana
-function ventanasHoy(st) {
-  const hoy = hoyStr();
-  const j = jornada(hoy);
+// Ventanas de vigilia del día D (la última, en curso si está despierto) comparadas con las típicas de la semana
+function ventanasDia(D, st, actual) {
+  const j = jornada(D);
   if (!j) return [];
   const out = j.ventanas.map((v, i) => ({ min: v, n: i + 1 }));
   if (j.dormido) out.push({ min: j.ultimaVentana, n: out.length + 1, ultima: true });
-  else if (st.modo === 'dia' && st.desde) out.push({ min: minEntre(st.desde, local()), n: out.length + 1, enCurso: true });
+  else if (actual && st.modo === 'dia' && st.desde) out.push({ min: minEntre(st.desde, local()), n: out.length + 1, enCurso: true });
   const previas = [];
-  for (let k = 1; k <= 7; k++) { const p = jornada(masDias(hoy, -k)); if (p && p.dormido) previas.push(p); }
+  for (let k = 1; k <= 7; k++) { const p = jornada(masDias(D, -k)); if (p && p.dormido) previas.push(p); }
   for (const v of out) v.tipica = v.ultima ? mediana(previas.map((p) => p.ultimaVentana)) : mediana(previas.map((p) => p.ventanas[v.n - 1]));
-  const pred = prediccion(st);
+  const pred = actual ? prediccion(st) : null;
   const curso = out.find((v) => v.enCurso);
   if (curso && pred && !pred.sinDatos) curso.tipica = pred.ventana;     // la que toca ahora (siesta u hora de dormir)
   return out;
 }
 
-function pintarHoy(st = estadoActual()) {
-  const ev = paraDerivar();
-  const hoy = hoyStr();
-  const d = derivarNoche(ev, hoy, db.fichas);
-  const j = jornada(hoy);
-  // tiempo despierto acumulado hoy: desde que se despertó hasta ahora (o hasta dormirse), menos las siestas
-  const despierto = j ? minEntre(j.despertar, j.dormido || local()) - (d.sueno_dia_min || 0) : null;
-  const ahora = local();
-  const ivs = intervalos(ahora);
-  const vv = ventanasHoy(st);
+// Datos de la jornada D: la noche (fila D−1 del Excel/Hoja) + el día D, con el total en vivo si es la actual
+function datosJornada(win, st) {
+  const { D, actual, desde } = win;
+  const filas = new Map(historico(masDias(D, -1), D).map((r) => [r.fecha, r]));
+  const noche = filas.get(masDias(D, -1)) || {};
+  const dia = filas.get(D) || {};
+  let nocheMin = noche.sueno_noche_min ?? null;
+  let nocheEnCurso = false;
+  if (nocheMin == null && actual && st.fase === 'noche' && win.conInicio) {
+    // la noche aún no ha acabado: lo dormido hasta ahora (menos los despertares)
+    const ahora = local();
+    const desp = vivos().filter((e) => e.tipo === 'despertar_noche' && e.ini >= desde)
+      .reduce((a, e) => a + minEntre(e.ini, e.fin || ahora), 0);
+    nocheMin = minEntre(desde, ahora) - desp;
+    nocheEnCurso = true;
+  }
+  const diaMin = dia.despertar ? dia.sueno_dia_min ?? 0 : null;
+  const total = nocheMin == null && diaMin == null ? null : (nocheMin || 0) + (diaMin || 0);
+  // despertares de esa noche: todos los registrados; los que acaban en toma se cuentan aparte (el Excel no los cuenta)
+  const finNoche = dia.despertar ? D + 'T' + dia.despertar : local();
+  const todos = win.conInicio ? vivos().filter((e) => e.tipo === 'despertar_noche' && e.ini >= desde && e.ini <= finNoche + ':59').length : null;
+  return { noche, dia, nocheMin, nocheEnCurso, diaMin, total, todos };
+}
+
+function pintarJornada(win, st) {
+  const { D, actual } = win;
+  const j = datosJornada(win, st);
+  const { noche: n, dia: d } = j;
+  const nombreD = (x) => new Date(x + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric' });
+  // total de la jornada frente al típico (mediana de los 7 «sueño 24 h» anteriores)
+  const previos = historico(masDias(D, -8), masDias(D, -1)).map((r) => r.sueno_24h_min).filter((x) => x != null);
+  const tipico = mediana(previos);
+  const pct = j.total != null && tipico ? Math.min(100, Math.round((j.total / tipico) * 100)) : 0;
+  $('#total-jornada').innerHTML = `
+    <div class="tarjeta-cab"><h2>Sueño total de la jornada</h2><span class="suave">${actual ? 'hasta ahora' : ''}</span></div>
+    <div class="total-grande">${durTxt(j.total)}</div>
+    <div class="reparto">
+      <span style="--c:var(--noche)">noche ${durTxt(j.nocheMin)}${j.nocheEnCurso ? ' (en curso)' : ''}</span>
+      <span style="--c:var(--siesta)">siestas ${durTxt(j.diaMin)}</span>
+    </div>
+    ${tipico ? `<div class="barra-prog"><i style="width:${pct}%"></i></div><p class="suave">típico de la última semana: ${durTxt(tipico)}</p>` : ''}`;
+
+  // ---- noche (empieza la tarde de D−1) ----
+  const dN = masDias(D, -1);
+  const f = db.fichas[dN] || {};
+  const conToma = j.todos != null && n.despertares != null ? Math.max(0, j.todos - n.despertares) : 0;
+  const empezada = n.dormido || win.conInicio;
+  $('#anoche').innerHTML = `<div class="tarjeta-cab"><h2>Noche · ${nombreD(dN)} → ${nombreD(D).split(' ').pop()}${(f.noche_mala ?? n.noche_mala) ? '<span class="etiqueta-mala">noche mala</span>' : ''}</h2></div>
+    ${empezada ? `<div class="cifras">
+      ${cifra(n.dormido || '—', 'se durmió')}
+      ${cifra(durTxt(n.latencia_min), 'latencia')}
+      ${cifra(durTxt(n.llanto_min), 'llanto')}
+      ${cifra(durTxt(j.nocheMin), j.nocheEnCurso ? 'sueño nocturno, hasta ahora' : 'sueño nocturno', 'destacada')}
+      ${cifra(durTxt(n.tramo_largo_min), 'tramo más largo')}
+      ${cifra(n.despertar_sig || '—', 'despertar')}
+      ${cifra(n.tomas ?? '—', 'tomas')}
+      ${cifra(durTxt(n.tomas_min), 'tiempo de tomas')}
+      ${cifra(j.todos ?? n.despertares ?? '—', conToma ? `despertares · ${conToma} con toma` : 'despertares')}
+    </div>
+    ${(f.notas ?? n.notas) ? `<p class="suave">“${esc(f.notas ?? n.notas)}”</p>` : ''}
+    ${n.origen === 'Excel' ? '<p class="suave">Noche del Excel: solo hay totales.</p>' : `<button class="enlace" id="abrir-ficha">${f.noche_mala || f.notas ? 'Editar ficha de la noche' : 'Noche mala, notas o datos a mano'} →</button>`}`
+    : '<p class="vacio">La noche de esta jornada aún no ha empezado.</p>'}`;
+  const bf = $('#abrir-ficha');
+  if (bf) bf.onclick = () => abrirFicha(dN);
+
+  // ---- día D ----
+  const dj = jornada(D);
+  const despierto = dj ? minEntre(dj.despertar, dj.dormido || (actual ? local() : dj.despertar)) - (d.sueno_dia_min || 0) : d.despierto_min ?? null;
+  const vv = ventanasDia(D, st, actual);
   const chips = vv.map((v) => `<div class="vv${v.enCurso ? ' curso' : ''}">
       <span class="vv-n">${v.enCurso ? 'ahora' : v.ultima ? 'antes de dormir' : 'ventana ' + v.n}</span>
       <b>${durTxt(v.min)}</b>
       <span class="vv-t">${v.tipica ? 'típica ' + durTxt(v.tipica) : '&nbsp;'}</span></div>`).join('');
-  $('#hoy').innerHTML = `<div class="tarjeta-cab"><h2>Hoy</h2></div><div class="cifras">
+  const siestas = dj ? dj.siestas.map((s, i) => `<li><span>Siesta ${i + 1}</span><b>${hm(s.ini)}–${s.fin ? hm(s.fin) : (actual ? 'ahora' : '…')}</b><span>${durTxt(minEntre(s.ini, s.fin || local()))}</span></li>`).join('') : '';
+  $('#hoy').innerHTML = `<div class="tarjeta-cab"><h2>Día · ${nombreD(D)}</h2></div>
+    ${d.despertar || dj ? `<div class="cifras">
       ${cifra(d.despertar || '—', 'se despertó')}
       ${cifra(durTxt(d.sueno_dia_min), 'sueño de día', 'destacada')}
-      ${cifra(durTxt(despierto), 'despierto en total')}
+      ${cifra(durTxt(despierto), actual && !dj?.dormido ? 'despierto, hasta ahora' : 'despierto en total')}
     </div>
-    ${vv.length ? `<div class="sub-titulo">Ventanas de vigilia</div><div class="ventanas">${chips}</div>` : ''}
-    ${linea(hoy, ivs, ahora)}${linea(masDias(hoy, -1), ivs, ahora)}
-    <div class="leyenda"><span style="--c:var(--noche)">noche</span><span style="--c:var(--siesta)">siesta</span><span style="--c:var(--despierto)">despierto de noche</span><span style="--c:var(--toma)">toma</span></div>`;
+    ${siestas ? `<ul class="lista-siestas">${siestas}</ul>` : d.siestas != null ? `<p class="suave">${d.siestas} siesta${d.siestas === 1 ? '' : 's'} (el Excel no guarda las horas).</p>` : ''}
+    ${vv.length ? `<div class="sub-titulo">Ventanas de vigilia</div><div class="ventanas">${chips}</div>` : ''}`
+    : '<p class="vacio">El día de esta jornada aún no ha empezado.</p>'}`;
 }
 
-function pintarAnoche() {
-  const ayer = masDias(hoyStr(), -1);
-  const n = derivarNoche(paraDerivar(), ayer, db.fichas);
-  const f = db.fichas[ayer] || {};
-  // despertares: todos los registrados; los que acaban en toma se cuentan aparte (el Excel solo cuenta los otros)
-  const finNoche = n.despertar_sig ? masDias(ayer, 1) + 'T' + n.despertar_sig : local();
-  const inicioNoche = n.dormido ? ayer + 'T' + n.dormido : null;
-  const todos = inicioNoche ? vivos().filter((e) => e.tipo === 'despertar_noche' && e.ini >= inicioNoche && e.ini <= finNoche + ':59').length : null;
-  const conToma = todos != null && n.despertares != null ? Math.max(0, todos - n.despertares) : 0;
-  $('#anoche').innerHTML = `<div class="tarjeta-cab"><h2>Anoche${f.noche_mala ? '<span class="etiqueta-mala">noche mala</span>' : ''}</h2></div>
-    <div class="cifras">
-      ${cifra(n.dormido || '—', 'se durmió')}
-      ${cifra(durTxt(n.latencia_min), 'latencia')}
-      ${cifra(durTxt(n.llanto_min), 'llanto')}
-      ${cifra(durTxt(n.sueno_noche_min), 'sueño nocturno', 'destacada')}
-      ${cifra(durTxt(n.tramo_largo_min), 'tramo más largo')}
-      ${cifra(n.despertar_sig || '—', 'despertar')}
-      ${cifra(n.tomas ?? '—', 'tomas')}
-      ${cifra(todos ?? n.despertares ?? '—', conToma ? `despertares · ${conToma} con toma` : 'despertares')}
-      ${cifra(durTxt(n.sueno_24h_min), 'sueño 24 h')}
-    </div>
-    ${f.notas ? `<p class="suave">“${esc(f.notas)}”</p>` : ''}
-    <button class="enlace" id="abrir-ficha">${f.noche_mala || f.notas ? 'Editar ficha de la noche' : 'Noche mala, notas o datos a mano'} →</button>`;
-  $('#abrir-ficha').onclick = () => abrirFicha(ayer);
+// Cabecera de la jornada y navegación (flechas, deslizar el reloj, volver a hoy)
+function pintarCabJornada(win) {
+  const { D, actual } = win;
+  const largo = new Date(D + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#j-titulo').textContent = actual ? 'Jornada de hoy' : largo.charAt(0).toUpperCase() + largo.slice(1);
+  $('#j-sub').textContent = actual ? largo : 'noche del ' + new Date(masDias(D, -1) + 'T12:00:00').getDate() + ' + siestas del ' + new Date(D + 'T12:00:00').getDate();
+  $('#j-next').disabled = actual;
 }
 
 function pintarTendencia() {
@@ -442,22 +537,69 @@ function abrirNoche(D, r) {
   });
 }
 
+// Jornada que se está viendo: null = la actual; si no, la fecha «D» de otra jornada
+let jornadaVista = null;
+function verJornada(D) {
+  const actual = jornadaActual(estadoActual());
+  jornadaVista = !D || D >= actual ? null : D;
+  const c = $('#centro'); c.classList.remove('cambio'); void c.offsetWidth; c.classList.add('cambio');
+  pintar();
+}
+function ventanaVista(st) {
+  const actualD = jornadaActual(st);
+  const D = jornadaVista || actualD;
+  return ventanaJornada(D, D === actualD);
+}
+
+// centro del reloj cuando se mira una jornada pasada: su sueño total
+function pintarCentroPasado(win, st) {
+  const j = datosJornada(win, st);
+  $('#c-etiqueta').textContent = 'Sueño total';
+  $('#c-tiempo').textContent = durTxt(j.total);
+  $('#c-tiempo').classList.add('total');
+  $('#c-sub').innerHTML = `noche ${durTxt(j.nocheMin)} · siestas ${durTxt(j.diaMin)}`;
+  document.body.className = 'fase-noche';
+}
+
 function pintar() {
   if (!db.cfg || $('#principal').hidden) return;
-  if (vista === 'historial') { pintarHistorial($('#vista-historial'), { abrirNoche }); pintarSync(); return; }
+  if (vista === 'historial') { pintarHistorial($('#vista-historial'), { abrirNoche, abrirJornada: (D) => { mostrarVista('ahora'); verJornada(D); } }); pintarSync(); return; }
   const st = estadoActual();
-  const pred = prediccion(st);
+  const win = ventanaVista(st);
+  const pred = win.actual ? prediccion(st) : null;
   $('#fecha-hoy').textContent = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-  pintarCentro(st);
-  pintarDial(st, pred);
-  pintarAcciones(st);
-  pintarProximo(st, pred);
-  pintarHoy(st);
-  pintarAnoche();
+  pintarCabJornada(win);
+  if (win.actual) pintarCentro(st); else pintarCentroPasado(win, st);
+  pintarDial(win, pred);
+  if (win.actual) pintarAcciones(st);
+  else {
+    $('#acciones').innerHTML = '<button class="principal-btn" id="volver-hoy"><span>Volver a hoy</span></button>';
+    $('#volver-hoy').onclick = () => { vibrar(); verJornada(null); };
+  }
+  pintarProximo(win.actual ? st : { modo: 'otra' }, pred);
+  pintarJornada(win, st);
   pintarTendencia();
   pintarRegistro();
   pintarSync();
 }
+
+// navegación entre jornadas: flechas y deslizar el reloj
+$('#j-prev').onclick = () => { vibrar(8); verJornada(masDias(ventanaVista(estadoActual()).D, -1)); };
+$('#j-next').onclick = () => { vibrar(8); verJornada(masDias(ventanaVista(estadoActual()).D, 1)); };
+(() => {
+  const zona = $('.reloj-24');
+  let x0 = null, y0 = null;
+  zona.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  zona.addEventListener('touchend', (e) => {
+    if (x0 == null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    vibrar(8);
+    const D = ventanaVista(estadoActual()).D;
+    verJornada(masDias(D, dx > 0 ? -1 : 1));                 // deslizar a la derecha = jornada anterior
+  });
+})();
 onCambio(() => pintar());
 
 // ---------- aviso con ajuste de hora ----------
@@ -702,9 +844,12 @@ let ticks = 0;
 setInterval(() => {
   if (!db.cfg || document.hidden || $('#principal').hidden) return;
   const st = estadoActual();
+  const win = ventanaVista(st);
+  if (!win.actual) return;
+  if (jornadaActual(st) !== win.D) return pintar();       // ha empezado otra jornada (se ha dormido)
   pintarCentro(st);
-  if (++ticks % 30 === 0) { pintarDial(st, prediccion(st)); pintarProximo(st, prediccion(st)); }
-  if (ticks % 60 === 0) pintarHoy(st);                 // despierto en total y ventana en curso, cada minuto
+  if (++ticks % 30 === 0) { pintarDial(win, prediccion(st)); pintarProximo(st, prediccion(st)); }
+  if (ticks % 60 === 0) pintarJornada(win, st);         // totales y ventana en curso, cada minuto
 }, 1000);
 setInterval(recibir, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { pintar(); enviar(); recibir(); } });

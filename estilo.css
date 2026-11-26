@@ -316,3 +316,52 @@ dialog.hoja::backdrop { background: rgba(3, 4, 15, .55); backdrop-filter: blur(3
 .lista-noches .ln-v.mala { color: var(--llanto); }
 .grafico-h .rejilla { stroke: rgba(255, 255, 255, .07); }
 .grafico-h .eje-y { text-anchor: end; fill: var(--tenue); font-size: 9.5px; }
+
+/* ---------- jornada ---------- */
+.nav-jornada { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; }
+.nav-jornada button { width: 40px; height: 40px; flex: none; border-radius: 50%; border: 1px solid var(--borde); background: var(--vidrio); color: var(--texto); font: inherit; font-size: 22px; line-height: 1; }
+.nav-jornada button:disabled { opacity: .25; }
+.nav-jornada .j-txt { flex: 1; text-align: center; }
+.nav-jornada .j-txt b { display: block; font-size: 16px; font-weight: 800; }
+.nav-jornada .j-txt small { display: block; color: var(--suave); font-size: 12px; font-weight: 600; }
+#dial .inicio { fill: var(--cielo-2); stroke: var(--noche); stroke-width: 2.5; }
+#dial .inicio-luna { fill: var(--noche); }
+#dial .vacio-dial { fill: var(--tenue); font-size: 12px; font-weight: 700; text-anchor: middle; font-family: inherit; }
+.total-grande { font-size: 40px; font-weight: 800; letter-spacing: -.02em; color: var(--acento); font-variant-numeric: tabular-nums; }
+.reparto { display: flex; gap: 14px; flex-wrap: wrap; color: var(--suave); font-size: 13px; font-weight: 700; margin: 2px 0 4px; }
+.reparto span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; background: var(--c); }
+.lista-siestas { list-style: none; margin: 14px 0 0; padding: 0; }
+.lista-siestas li { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--borde); }
+.lista-siestas li span:first-child { color: var(--suave); font-weight: 700; font-size: 13px; width: 66px; }
+.lista-siestas li b { flex: 1; font-variant-numeric: tabular-nums; }
+.lista-siestas li span:last-child { color: var(--siesta); font-weight: 800; }
+
+/* ---------- calendario (historial) ---------- */
+.cal-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cal-cab b { font-size: 16px; }
+.cal-cab b::first-letter { text-transform: uppercase; }
+.cal-cab button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--borde); background: var(--vidrio); color: var(--texto); font: inherit; font-size: 20px; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.cal .dsem { color: var(--tenue); font-size: 11px; font-weight: 800; padding: 4px 0; }
+.cal button { aspect-ratio: 1; border-radius: 12px; border: 1px solid transparent; background: none; color: var(--tenue); font: inherit; font-weight: 800; font-size: 14px; position: relative; }
+.cal button.con { color: var(--texto); background: var(--vidrio); border-color: var(--borde); }
+.cal button.con::after { content: ""; position: absolute; left: 50%; bottom: 5px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--c, var(--noche)); }
+.cal button.mala { --c: var(--llanto); }
+.cal button.hoy { border-color: var(--acento); }
+
+/* ---------- panel «¿cuándo?» ---------- */
+.ahora-btn {
+  display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 78px; margin: 14px 0 6px;
+  border: 0; border-radius: 24px; font: inherit; font-size: 22px; font-weight: 800; color: #17142e; cursor: pointer;
+  background: linear-gradient(135deg, var(--acento), color-mix(in srgb, var(--acento) 70%, #fff)); box-shadow: 0 12px 34px -12px var(--acento);
+}
+.ahora-btn svg { width: 28px; height: 28px; }
+.ahora-btn small { font-size: 15px; font-weight: 700; opacity: .7; margin-left: 6px; }
+.hace { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hace button { padding: 10px 4px; border-radius: 16px; border: 1px solid var(--borde); background: var(--vidrio); color: var(--texto); font: inherit; }
+.hace b { display: block; font-size: 16px; font-weight: 800; }
+.hace small { color: var(--suave); font-weight: 700; }
+.otra-hora { margin-top: 14px; }
+.otra-hora summary { color: var(--acento); font-weight: 800; cursor: pointer; padding: 6px 0; }
+.c-tiempo { white-space: nowrap; }
+.c-tiempo.total { font-size: clamp(32px, 10vw, 44px); }

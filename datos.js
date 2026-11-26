@@ -119,7 +119,7 @@ const CAB = {
   'Total awake time (to sleep onset)': ['despierto_min', 'd'], 'Wake-up time (next morning)': ['despertar_sig', 't'],
   'Number of feedings': ['tomas', 'n'], 'Bad night? (multiples despertares, early wake, etc)': ['noche_mala', 'b'],
   'Wakings (not counting the feeding ones)': ['despertares', 'n'], 'Total night sleep': ['sueno_noche_min', 'd'],
-  'Longest sleep stretch': ['tramo_largo', 't'], 'Duration of longest sleep stretch': ['tramo_largo_min', 'd'], 'Notes': ['notas', 't'], 'Source': ['origen', 't'],
+  'Longest sleep stretch': ['tramo_largo', 't'], 'Duration of longest sleep stretch': ['tramo_largo_min', 'd'], 'Notes': ['notas', 't'], 'Source': ['origen', 't'], 'Total feeding time': ['tomas_min', 'd'],
 };
 const leerDur = (v) => { const s = String(v ?? '').trim(); let m = s.match(/^(\d+):(\d{2})/); if (m) return +m[1] * 60 + +m[2]; m = s.match(/^(\d+)\s*min/); if (m) return +m[1]; return s === '' ? null : (Number.isFinite(+s) ? +s : null); };
 export function filaAObj(f) {

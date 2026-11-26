@@ -44,8 +44,32 @@ const diaCorto = (D) => new Date(D + 'T12:00:00').toLocaleDateString('es-ES', { 
 let periodo = leerLS('h.periodo', 14);
 let metrica = leerLS('h.metrica', 'sueno_noche_min');
 let seleccion = null;
+let mesCal = null;                                   // 'AAAA-MM' del calendario
 
-export function pintarHistorial(cont, { abrirNoche } = {}) {
+// Calendario: cada día es una jornada (la noche anterior + sus siestas). Punto rojo si esa noche fue mala.
+function calendario(todo) {
+  const hoy = hoyStr();
+  if (!mesCal) mesCal = hoy.slice(0, 7);
+  const porFecha = new Map(todo.map((r) => [r.fecha, r]));
+  const [y, m] = mesCal.split('-').map(Number);
+  const primero = new Date(y, m - 1, 1);
+  const dias = new Date(y, m, 0).getDate();
+  const hueco = (primero.getDay() + 6) % 7;
+  let celdas = ['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d) => `<span class="dsem">${d}</span>`).join('') + '<span></span>'.repeat(hueco);
+  for (let d = 1; d <= dias; d++) {
+    const D = `${mesCal}-${pad(d)}`;
+    const conDatos = porFecha.has(D) || porFecha.has(masDias(D, -1));
+    const mala = porFecha.get(masDias(D, -1))?.noche_mala;
+    celdas += `<button data-j="${D}" class="${conDatos && D <= hoy ? 'con' : ''}${mala ? ' mala' : ''}${D === hoy ? ' hoy' : ''}" ${D > hoy ? 'disabled' : ''}>${d}</button>`;
+  }
+  const nombre = primero.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  return `<section class="tarjeta">
+    <div class="cal-cab"><button data-mes="-1">‹</button><b>${nombre}</b><button data-mes="1" ${mesCal >= hoy.slice(0, 7) ? 'disabled' : ''}>›</button></div>
+    <div class="cal">${celdas}</div>
+    <p class="suave">Toca un día para ver su jornada: la noche anterior + sus siestas.</p></section>`;
+}
+
+export function pintarHistorial(cont, { abrirNoche, abrirJornada } = {}) {
   const hoy = hoyStr();
   const todo = historico('2000-01-01', masDias(hoy, -1)).filter((r) => r.sueno_noche_min != null || r.dormido);
   if (!todo.length) { cont.innerHTML = '<section class="tarjeta"><p class="vacio">Aún no hay noches en el histórico.</p></section>'; return; }
@@ -145,6 +169,7 @@ export function pintarHistorial(cont, { abrirNoche } = {}) {
       <span class="ln-v${r.noche_mala ? ' mala' : ''}">${durTxt(r.sueno_noche_min)}</span></li>`).join('');
 
   cont.innerHTML = `
+    ${calendario(todo)}
     <div class="periodo">${chipsPeriodo}</div>
     <section class="tarjeta">
       <div class="tarjeta-cab"><h2>Resumen · ${actual.length} noches</h2><span class="suave">${periodo ? 'vs las ' + anterior.length + ' anteriores' : diaCorto(todo[0].fecha) + ' → hoy'}</span></div>
@@ -167,7 +192,9 @@ export function pintarHistorial(cont, { abrirNoche } = {}) {
       <ul class="lista-noches">${lista}</ul>
     </section>`;
 
-  const repintar = () => pintarHistorial(cont, { abrirNoche });
+  const repintar = () => pintarHistorial(cont, { abrirNoche, abrirJornada });
+  cont.querySelectorAll('[data-mes]').forEach((b) => { b.onclick = () => { const [y, m] = mesCal.split('-').map(Number); const d = new Date(y, m - 1 + Number(b.dataset.mes), 1); mesCal = d.getFullYear() + '-' + pad(d.getMonth() + 1); repintar(); }; });
+  cont.querySelectorAll('[data-j]').forEach((b) => { b.onclick = () => abrirJornada?.(b.dataset.j); });
   cont.querySelectorAll('[data-p]').forEach((b) => { b.onclick = () => { periodo = Number(b.dataset.p); escribirLS('h.periodo', periodo); seleccion = null; repintar(); }; });
   cont.querySelectorAll('[data-m]').forEach((b) => { b.onclick = () => { metrica = b.dataset.m; escribirLS('h.metrica', metrica); repintar(); }; });
   cont.querySelectorAll('.zona').forEach((z) => { z.onclick = () => { seleccion = z.dataset.f; repintar(); }; });

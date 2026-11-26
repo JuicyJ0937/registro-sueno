@@ -93,6 +93,7 @@ export function derivarNoche(eventos, D, fichas = {}) {
     despierto_min: tDesp != null && tDorm != null ? mins(tDorm - tDesp - suenoDia) : null,
     despertar_sig: hhmm(tSig),
     tomas: tSig != null ? tomas.length : null,
+    tomas_min: tSig != null ? mins(tomas.reduce((a, t) => a + dur(t), 0)) : null,   // tiempo total de tomas de la noche
     noche_mala: ficha.noche_mala ?? null,
     despertares: tSig != null ? despSinToma.length : null,
     sueno_noche_min: mins(noche),
