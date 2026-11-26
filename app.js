@@ -87,6 +87,7 @@ function ventanaJornada(D, actual) {
   return { D, actual, desde, hasta, conInicio: !!ini, cerrada: !!fin };
 }
 
+let dialEstado = null;                            // lo dibujado ahora en el reloj (para saber qué se toca)
 function pintarDial(win, pred) {
   const ahora = local();
   const { desde, actual } = win;
@@ -112,15 +113,18 @@ function pintarDial(win, pred) {
     const [lx, ly] = punto(R - 31, medio);
     s += `<text class="prevista-t" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${pred.tipo === 'dormir' ? 'dormir' : 'siesta'} ≈ ${hm(pred.cuando)}</text>`;
   }
-  const dibujar = (cls, r, filtro) => ivs.filter(filtro).forEach((x) => {
-    const d = arco(r, x.a, x.b);
+  dialEstado = { desde, hasta, ivs };
+  // los tramos muy cortos (despertares, llanto) se dibujan con un mínimo de 6 min para que se vean
+  const dibujar = (cls, r, filtro, minVis = 0) => ivs.filter(filtro).forEach((x) => {
+    const b = minVis && minEntre(x.a, x.b) < minVis ? sumarMin(x.a, minVis) : x.b;
+    const d = arco(r, x.a, b);
     if (d) s += `<path class="arco ${cls}${x.vivo && actual ? ' vivo' : ''}" data-id="${x.ev.id}" d="${d}"/>`;
   });
   dibujar('noche', R, (x) => x.cls === 'noche');
   dibujar('siesta', R, (x) => x.cls === 'siesta');
-  dibujar('despierto-noche', R, (x) => x.cls === 'desp');
+  dibujar('despierto-noche', R, (x) => x.cls === 'desp', 6);
   dibujar('cuna', R - 24, (x) => x.cls === 'cuna');
-  dibujar('llanto', R - 24, (x) => x.cls === 'llanto');
+  dibujar('llanto', R - 24, (x) => x.cls === 'llanto', 6);
   ivs.filter((x) => x.cls === 'toma').forEach((x) => { const [px, py] = punto(R, angulo(x.a)); s += `<circle class="toma" data-id="${x.ev.id}" cx="${px}" cy="${py}" r="6.5"/>`; });
   if (win.conInicio) {                              // marca de inicio de la jornada (se durmió)
     const [ix, iy] = punto(R, angulo(desde));
@@ -133,10 +137,57 @@ function pintarDial(win, pred) {
   if (!ivs.length) s += `<text class="vacio-dial" x="${C}" y="${C + 70}">sin registros con hora</text>`;
   $('#dial').innerHTML = s;
 }
+// Toque en el reloj: no hace falta acertar en una raya fina. Se mira a qué hora corresponde el punto tocado
+// y se buscan los eventos a menos de ~15 min. Los cortos (despertares, tomas, llanto) tienen prioridad sobre
+// la franja de la noche; si hay varios cerca, se elige en una lista.
+const TOLERANCIA_MIN = 15;
 $('#dial').addEventListener('click', (e) => {
-  const id = e.target.closest('[data-id]')?.dataset.id;
-  if (id && db.eventos.get(id)) { vibrar(); abrirEditor(db.eventos.get(id)); }
+  if (!dialEstado) return;
+  const svg = $('#dial');
+  const p = svg.createSVGPoint();
+  p.x = e.clientX; p.y = e.clientY;
+  const q = p.matrixTransform(svg.getScreenCTM().inverse());
+  const dx = q.x - C, dy = q.y - C, r = Math.hypot(dx, dy);
+  if (r < R - 45 || r > R + 30) return;                            // fuera del anillo
+  const min = ((((Math.atan2(dy, dx) + Math.PI / 2) / (2 * Math.PI)) * 1440) + 1440) % 1440;
+  const { desde, hasta, ivs } = dialEstado;
+  let t = `${desde.slice(0, 10)}T${pad(Math.floor(min / 60))}:${pad(Math.floor(min % 60))}:00`;
+  if (minEntre(t, desde) > TOLERANCIA_MIN) t = sumarMin(t, 1440);   // la hora tocada cae ya en el día siguiente
+  const interior = r < R - 14;                                     // anillo de dentro: cuna y llanto
+  const distancia = (a, b) => (a <= t && t <= b ? 0 : Math.min(Math.abs(minEntre(a, t)), Math.abs(minEntre(b, t))));
+  const prioridad = (cls) => {
+    if (cls === 'llanto' || cls === 'cuna') return interior ? 0 : 3;
+    if (cls === 'toma' || cls === 'desp' || cls === 'despertar') return interior ? 2 : 0;
+    if (cls === 'siesta') return 1;
+    return 4;                                                      // la franja de la noche, lo último
+  };
+  const candidatos = ivs.map((x) => ({ ev: x.ev, cls: x.cls, d: distancia(x.a, x.b) }));
+  // los «se despertó» son puntos (final de la noche)
+  vivos().filter((x) => x.tipo === 'despertar' && x.t >= desde && x.t <= hasta)
+    .forEach((x) => candidatos.push({ ev: x, cls: 'despertar', d: Math.abs(minEntre(x.t, t)) }));
+  const vistos = new Set();
+  const cerca = candidatos.filter((c) => c.d <= TOLERANCIA_MIN)
+    .sort((a, b) => prioridad(a.cls) - prioridad(b.cls) || a.d - b.d)
+    .filter((c) => !vistos.has(c.ev.id) && vistos.add(c.ev.id));
+  if (!cerca.length) return;
+  vibrar();
+  const cortos = cerca.filter((c) => prioridad(c.cls) < 3);
+  if (cortos.length <= 1) { abrirEditor(db.eventos.get((cortos[0] || cerca[0]).ev.id)); return; }
+  elegirEvento(cerca.map((c) => c.ev));
 });
+
+// Varios eventos en el mismo sitio del reloj: lista para elegir cuál abrir
+function elegirEvento(lista) {
+  abrirHoja(`<h3>¿Cuál quieres ver?</h3><ul class="registro">${lista.map((e) => `
+      <li data-id="${e.id}" style="--c:${COLOR_TIPO[e.tipo]}"><span class="r-ico">${ico(ICO_TIPO[e.tipo])}</span>
+      <span class="r-que">${esc(NOMBRES[e.tipo])}<small>${e.fin ? durTxt(minEntre(e.ini, e.fin)) : TRAMOS.has(e.tipo) ? 'en curso' : ''}</small></span>
+      <span class="r-hora">${hm(ini(e))}${e.fin ? '–' + hm(e.fin) : ''}</span></li>`).join('')}</ul>`, (cont) => {
+    cont.querySelectorAll('[data-id]').forEach((li) => {
+      li.onclick = () => { cerrarHoja(); abrirEditor(db.eventos.get(li.dataset.id)); };
+    });
+  });
+}
+
 
 // ---------- centro del reloj ----------
 const reloj = (seg) => {
@@ -406,9 +457,19 @@ function pintarJornada(win, st) {
       ${cifra(durTxt(n.tomas_min), 'tiempo de tomas')}
       ${cifra(j.todos ?? n.despertares ?? '—', conToma ? `despertares · ${conToma} con toma` : 'despertares')}
     </div>
+    ${(() => {
+      // lo que pasó durante la noche (despertares y tomas), en una lista fácil de tocar para editar
+      const finN = d.despertar ? D + 'T' + d.despertar + ':59' : local();
+      const sucesos = win.conInicio ? vivos().filter((e) => (e.tipo === 'despertar_noche' || e.tipo === 'toma') && e.ini >= win.desde && e.ini <= finN) : [];
+      return sucesos.length ? `<div class="sub-titulo">Durante la noche</div><ul class="registro sucesos">${sucesos.map((e) => `
+        <li data-ev="${e.id}" style="--c:${COLOR_TIPO[e.tipo]}"><span class="r-ico">${ico(ICO_TIPO[e.tipo])}</span>
+        <span class="r-que">${esc(NOMBRES[e.tipo])}<small>${e.fin ? durTxt(minEntre(e.ini, e.fin)) : 'en curso'}</small></span>
+        <span class="r-hora">${hm(e.ini)}${e.fin ? '–' + hm(e.fin) : ''}</span></li>`).join('')}</ul>` : '';
+    })()}
     ${(f.notas ?? n.notas) ? `<p class="suave">“${esc(f.notas ?? n.notas)}”</p>` : ''}
     ${n.origen === 'Excel' ? '<p class="suave">Noche del Excel: solo hay totales.</p>' : `<button class="enlace" id="abrir-ficha">${f.noche_mala || f.notas ? 'Editar ficha de la noche' : 'Noche mala, notas o datos a mano'} →</button>`}`
     : '<p class="vacio">La noche de esta jornada aún no ha empezado.</p>'}`;
+  $('#anoche').querySelectorAll('[data-ev]').forEach((li) => { li.onclick = () => { vibrar(); abrirEditor(db.eventos.get(li.dataset.ev)); }; });
   const bf = $('#abrir-ficha');
   if (bf) bf.onclick = () => abrirFicha(dN);
 

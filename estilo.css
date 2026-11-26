@@ -368,3 +368,4 @@ dialog.hoja::backdrop { background: rgba(3, 4, 15, .55); backdrop-filter: blur(3
 .c-tiempo { white-space: nowrap; }
 .c-tiempo.total { font-size: clamp(32px, 10vw, 44px); }
 .reloj-24 { touch-action: pan-y; will-change: transform; }
+.registro.sucesos li { padding: 7px 0; } .registro.sucesos .r-ico { width: 30px; height: 30px; border-radius: 10px; }
