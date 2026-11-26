@@ -99,7 +99,9 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--acento); ou
 #dial .arco.despierto-noche { stroke: var(--despierto); stroke-width: 26; stroke-linecap: butt; }
 #dial .arco.cuna { stroke: var(--cuna); stroke-width: 6; stroke-dasharray: 2 5; }
 #dial .arco.llanto { stroke: var(--llanto); stroke-width: 6; }
-#dial .arco.prevista { stroke: var(--acento); stroke-width: 26; opacity: .22; stroke-dasharray: 3 6; stroke-linecap: butt; }
+#dial .arco.prevista { stroke: var(--acento); stroke-width: 26; opacity: .2; stroke-linecap: butt; }
+#dial .prevista-borde { fill: none; stroke: var(--acento); stroke-width: 1.5; stroke-dasharray: 3 3; opacity: .7; }
+#dial .prevista-t { fill: var(--acento); font-size: 11px; font-weight: 800; text-anchor: middle; dominant-baseline: central; font-family: inherit; }
 #dial .arco.viejo { opacity: .45; }
 #dial .arco.vivo { filter: drop-shadow(0 0 8px currentColor); animation: brillo 2.4s ease-in-out infinite; }
 #dial .arco.siesta.vivo { color: var(--siesta); }

@@ -104,7 +104,13 @@ function pintarDial(win, pred) {
   }
   if (pred && !pred.sinDatos && pred.cuando > ahora) {
     const dur = pred.tipo === 'dormir' ? 90 : 50;
-    s += `<path class="arco prevista" d="${arco(R, pred.cuando, sumarMin(pred.cuando, dur))}"/>`;
+    // franja suave (no es un registro) + bordes punteados + etiqueta por dentro del anillo
+    const fin = sumarMin(pred.cuando, dur);
+    s += `<path class="arco prevista" d="${arco(R, pred.cuando, fin)}"/>`;
+    s += `<path class="prevista-borde" d="${arco(R + 13, pred.cuando, fin)}"/><path class="prevista-borde" d="${arco(R - 13, pred.cuando, fin)}"/>`;
+    const medio = angulo(sumarMin(pred.cuando, dur / 2));
+    const [lx, ly] = punto(R - 31, medio);
+    s += `<text class="prevista-t" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${pred.tipo === 'dormir' ? 'dormir' : 'siesta'} ≈ ${hm(pred.cuando)}</text>`;
   }
   const dibujar = (cls, r, filtro) => ivs.filter(filtro).forEach((x) => {
     const d = arco(r, x.a, x.b);
