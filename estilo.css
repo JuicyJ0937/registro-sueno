@@ -367,3 +367,4 @@ dialog.hoja::backdrop { background: rgba(3, 4, 15, .55); backdrop-filter: blur(3
 .otra-hora summary { color: var(--acento); font-weight: 800; cursor: pointer; padding: 6px 0; }
 .c-tiempo { white-space: nowrap; }
 .c-tiempo.total { font-size: clamp(32px, 10vw, 44px); }
+.reloj-24 { touch-action: pan-y; will-change: transform; }

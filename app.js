@@ -548,7 +548,6 @@ let jornadaVista = null;
 function verJornada(D) {
   const actual = jornadaActual(estadoActual());
   jornadaVista = !D || D >= actual ? null : D;
-  const c = $('#centro'); c.classList.remove('cambio'); void c.offsetWidth; c.classList.add('cambio');
   pintar();
 }
 function ventanaVista(st) {
@@ -580,7 +579,7 @@ function pintar() {
   if (win.actual) pintarAcciones(st);
   else {
     $('#acciones').innerHTML = '<button class="principal-btn" id="volver-hoy"><span>Volver a hoy</span></button>';
-    $('#volver-hoy').onclick = () => { vibrar(); verJornada(null); };
+    $('#volver-hoy').onclick = () => cambiarJornada(1, 0, null);
   }
   pintarProximo(win.actual ? st : { modo: 'otra' }, pred);
   pintarJornada(win, st);
@@ -589,21 +588,73 @@ function pintar() {
   pintarSync();
 }
 
-// navegación entre jornadas: flechas y deslizar el reloj
-$('#j-prev').onclick = () => { vibrar(8); verJornada(masDias(ventanaVista(estadoActual()).D, -1)); };
-$('#j-next').onclick = () => { vibrar(8); verJornada(masDias(ventanaVista(estadoActual()).D, 1)); };
+// navegación entre jornadas: flechas y deslizar el reloj, con transición
+// El reloj sigue al dedo mientras se arrastra; al soltar sale por un lado y la otra jornada entra por el contrario.
+const sinMovimiento = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let enTransicion = false;
+async function cambiarJornada(paso, desdeX = 0, fijo) {             // fijo: ir directamente a esa jornada (null = hoy)
+  const D = ventanaVista(estadoActual()).D;
+  const destino = fijo !== undefined ? fijo : masDias(D, paso);
+  if (fijo === undefined && paso > 0 && D === jornadaActual(estadoActual())) { volverAlSitio(desdeX); return; }   // no hay jornadas futuras
+  if (enTransicion) return;
+  enTransicion = true;
+  vibrar(8);
+  const zona = $('.reloj-24');
+  const tarjetas = ['#total-jornada', '#anoche', '#hoy', '#acciones'].map((s) => $(s));
+  const lado = paso < 0 ? 1 : -1;                     // anterior: sale hacia la derecha y entra por la izquierda
+  try {
+    if (!sinMovimiento()) {
+      // como mucho 260 ms: si el navegador no avanza la animación (pantalla en segundo plano), se sigue igual
+      await Promise.race([new Promise((r) => setTimeout(r, 260)), Promise.all([
+        zona.animate([{ transform: `translateX(${desdeX}px)`, opacity: 1 - Math.min(.5, Math.abs(desdeX) / 600) },
+          { transform: `translateX(${lado * 55}%) rotate(${lado * 8}deg)`, opacity: 0 }], { duration: 200, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' }).finished,
+        ...tarjetas.map((t) => t.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, fill: 'forwards' }).finished),
+      ])]);
+    }
+    verJornada(destino);
+    if (!sinMovimiento()) {
+      zona.getAnimations().forEach((x) => x.cancel());
+      tarjetas.forEach((t) => t.getAnimations().forEach((x) => x.cancel()));
+      zona.style.transform = '';
+      zona.animate([{ transform: `translateX(${-lado * 55}%) rotate(${-lado * 8}deg)`, opacity: 0 },
+        { transform: 'none', opacity: 1 }], { duration: 340, easing: 'cubic-bezier(.2,.9,.25,1)' });
+      tarjetas.forEach((t, i) => t.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
+        { duration: 320, delay: 60 + i * 40, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'backwards' }));
+    }
+  } finally {
+    zona.style.transform = '';
+    enTransicion = false;
+  }
+}
+function volverAlSitio(desdeX) {
+  const zona = $('.reloj-24');
+  zona.style.transform = '';
+  if (desdeX && !sinMovimiento()) zona.animate([{ transform: `translateX(${desdeX}px)` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.2,.9,.25,1)' });
+}
+$('#j-prev').onclick = () => cambiarJornada(-1);
+$('#j-next').onclick = () => cambiarJornada(1);
 (() => {
   const zona = $('.reloj-24');
-  let x0 = null, y0 = null;
-  zona.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
-  zona.addEventListener('touchend', (e) => {
+  let x0 = null, y0 = null, horizontal = null, dx = 0;
+  zona.addEventListener('touchstart', (e) => { if (enTransicion) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; horizontal = null; dx = 0; }, { passive: true });
+  zona.addEventListener('touchmove', (e) => {
     if (x0 == null) return;
-    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    dx = e.touches[0].clientX - x0;
+    const dy = e.touches[0].clientY - y0;
+    if (horizontal == null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) horizontal = Math.abs(dx) > Math.abs(dy);
+    if (!horizontal) return;
+    // sigue al dedo; hacia la derecha en la jornada de hoy (no hay siguiente) ofrece resistencia
+    const esHoy = ventanaVista(estadoActual()).D === jornadaActual(estadoActual());
+    const x = dx < 0 && esHoy ? dx / 4 : dx;
+    zona.style.transform = `translateX(${x}px) rotate(${x / 40}deg)`;
+    zona.style.opacity = String(1 - Math.min(.4, Math.abs(x) / 700));
+  }, { passive: true });
+  zona.addEventListener('touchend', () => {
+    if (x0 == null) return;
     x0 = null;
-    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    vibrar(8);
-    const D = ventanaVista(estadoActual()).D;
-    verJornada(masDias(D, dx > 0 ? -1 : 1));                 // deslizar a la derecha = jornada anterior
+    zona.style.opacity = '';
+    if (!horizontal || Math.abs(dx) < 60) { volverAlSitio(horizontal ? dx : 0); return; }
+    cambiarJornada(dx > 0 ? -1 : 1, dx);              // a la derecha = jornada anterior
   });
 })();
 onCambio(() => pintar());

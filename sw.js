@@ -1,5 +1,5 @@
 // Service worker: guarda la app en el móvil para que abra sin conexión. Las llamadas al servidor no se tocan.
-const VERSION = 'sm-5721380ece';
+const VERSION = 'sm-65fce15e98';
 const ARCHIVOS = ['./', 'index.html', 'estilo.css', 'app.js', 'datos.js', 'historial.js', 'derivar.js', 'manifest.webmanifest', 'icono.svg', 'icono-192.png', 'icono-512.png'];
 
 self.addEventListener('install', (e) => {
